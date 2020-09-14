@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading.Tasks;
 
 namespace Zupagood.Models
 {
     [Serializable]
     public class ZupaNode
     {
+        private readonly Object _lockObject = new Object();
+        //private ConcurrentDictionary<string, int> _pings;
         private Dictionary<string, int> _pings;
 
 
@@ -17,6 +20,7 @@ namespace Zupagood.Models
 
         public ZupaNode(string word)
         {
+            //_pings = new ConcurrentDictionary<string, int>();
             _pings = new Dictionary<string, int>();
 
             Content = word;
@@ -26,6 +30,7 @@ namespace Zupagood.Models
 
         public ZupaNode(List<ZupaNode> children)
         {
+            //_pings = new ConcurrentDictionary<string, int>();
             _pings = new Dictionary<string, int>();
 
             Content = null;
@@ -35,30 +40,31 @@ namespace Zupagood.Models
             children.ForEach(e => e.Parents.Add(this));
         }
 
-        public ZupaNode Ping(string guid, int count)
+        public void Ping(string guid, int count, Func<ZupaNode, ZupaNode> callback, ref bool shouldContinue)
         {
-            if (_pings.ContainsKey(guid))
+            int newPingValue = _pings.ContainsKey(guid) ? _pings[guid] + 1 : 1;
+
+            lock (_lockObject)
             {
-                _pings[guid] += 1;
-            }
-            else
-            {
-                _pings[guid] = 1;
+                // Increase the amount of pings for current ZupaNode.
+                _pings[guid] = newPingValue;
             }
 
+            // If current ZupaNode is a match, call the callback with it,
+            // if not, ping the next layer of parents.
             if (_pings[guid] == count)
-            {
-                return this;
-            }
+                callback(this);
             else
             {
-                List<ZupaNode> result = this.Parents.Select(e => e.Ping(guid, count)).ToList();
+                foreach (var parent in this.Parents)
+                    if (shouldContinue)
+                        parent.Ping(guid, count, callback, ref shouldContinue);
 
-                if (result.Any())
-                    return result.ElementAt(0);
+                //this.Parents.ForEach(e => e.Ping(guid, count, callback));
+
+                //Parallel.ForEach(this.Parents, parent => parent.Ping(guid, count, callback));
             }
 
-            return null;
         }
     }
 }

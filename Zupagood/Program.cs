@@ -65,8 +65,10 @@ namespace Zupagood
             _stopwatch.Reset();
             _stopwatch.Start();
 
+            ZupaNode currentResult = null;
+
             foreach (string sentence in sentences)
-                _zupaTrie.Query(sentence);
+                currentResult = _zupaTrie.Query(sentence);
 
             _stopwatch.Stop();
 

@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Zupagood.Models
 {
@@ -33,6 +35,7 @@ namespace Zupagood.Models
         public bool Search(string s)
         {
             var prefix = Prefix(s);
+
             return prefix.Depth == s.Length && prefix.FindChildNode('$') != null;
         }
 
@@ -56,18 +59,60 @@ namespace Zupagood.Models
 
         public ZupaNode Query(string input)
         {
+            ZupaNode resultNode = null;
+
             List<string> tokens = input.Split(' ').Select(e => e.Trim()).ToList();
 
             List<ZupaNode> childNodes = tokens.Select(token => Prefix(token).ZupaNode).ToList();
-            int childCount = childNodes.Count;
+
             string pingGuid = Guid.NewGuid().ToString();
+            bool shouldContinue = true;
 
-            for (int i = 0; i < childCount - 1; i++)
-            {
-                childNodes[i].Ping(pingGuid, childCount);
-            }
+            //Parallel.ForEach(childNodes, childNode => childNode.Ping(
+            //    pingGuid,
+            //    childNodes.Count,
+            //    new Func<ZupaNode, ZupaNode>(foundNode =>
+            //    {
+            //        resultNode = foundNode;
 
-            return childNodes[childCount - 1].Ping(pingGuid, childCount);
+            //        return resultNode;
+            //    })
+            //));
+
+            //childNodes.ForEach(childNode => {
+            //    if (shouldContinue)
+            //    {
+            //        childNode.Ping(
+            //            pingGuid,
+            //            childNodes.Count,
+            //            new Func<ZupaNode, ZupaNode>(foundNode =>
+            //            {
+            //                resultNode = foundNode;
+            //                shouldContinue = false;
+
+            //                return resultNode;
+            //            }),
+            //            ref shouldContinue
+            //        );
+            //    }
+            //});
+
+            foreach (var childNode in childNodes)
+                if (shouldContinue)
+                    childNode.Ping(
+                        pingGuid,
+                        childNodes.Count,
+                        new Func<ZupaNode, ZupaNode>(foundNode =>
+                        {
+                            resultNode = foundNode;
+                            shouldContinue = false;
+
+                            return resultNode;
+                        }),
+                        ref shouldContinue
+                    );
+
+            return resultNode;
         }
 
         public ZupaNode Insert(string s)
